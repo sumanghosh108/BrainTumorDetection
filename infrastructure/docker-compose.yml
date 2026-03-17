@@ -1,0 +1,115 @@
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------
+  # Backend API
+  # ---------------------------------------------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    container_name: bt-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      - LOG_LEVEL=INFO
+      - CORS_ORIGINS=http://localhost:3000
+    volumes:
+      - model-weights:/app/weights
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - bt-net
+
+  # ---------------------------------------------------------------
+  # Frontend
+  # ---------------------------------------------------------------
+  frontend:
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+    container_name: bt-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - bt-net
+
+  # ---------------------------------------------------------------
+  # PostgreSQL (local dev — Supabase is used in production)
+  # ---------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: bt-postgres
+    environment:
+      POSTGRES_DB: brain_tumor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../backend/database/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bt-net
+
+  # ---------------------------------------------------------------
+  # Prometheus
+  # ---------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: bt-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    networks:
+      - bt-net
+
+  # ---------------------------------------------------------------
+  # Grafana
+  # ---------------------------------------------------------------
+  grafana:
+    image: grafana/grafana-oss:10.4.2
+    container_name: bt-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/brain-tumor.json
+    volumes:
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - bt-net
+
+volumes:
+  pgdata:
+  model-weights:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  bt-net:
+    driver: bridge
