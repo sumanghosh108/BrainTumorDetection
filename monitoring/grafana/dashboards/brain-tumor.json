@@ -1,0 +1,112 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(starlette_requests_total[5m])",
+          "legendFormat": "{{method}} {{path_template}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "title": "Request Latency p95 (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(starlette_request_duration_seconds_bucket[5m])) * 1000",
+          "legendFormat": "p95 {{path_template}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "title": "HTTP Status Codes",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (status_code) (increase(starlette_requests_total[1h]))",
+          "legendFormat": "{{status_code}}"
+        }
+      ]
+    },
+    {
+      "title": "Active Predictions",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "expr": "starlette_requests_in_progress{path_template=\"/api/v1/scan/{scan_id}/predict\"}",
+          "legendFormat": "in progress"
+        }
+      ]
+    },
+    {
+      "title": "Total Scans Uploaded",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "increase(starlette_requests_total{path_template=\"/api/v1/scan/upload\", status_code=\"201\"}[24h])",
+          "legendFormat": "24h"
+        }
+      ]
+    },
+    {
+      "title": "Prediction Latency Distribution",
+      "type": "histogram",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(starlette_request_duration_seconds_bucket{path_template=\"/api/v1/scan/{scan_id}/predict\"}[5m])",
+          "legendFormat": "{{le}}"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(starlette_requests_total{status_code=~\"5..\"}[5m]))",
+          "legendFormat": "5xx errors/s"
+        },
+        {
+          "expr": "sum(rate(starlette_requests_total{status_code=~\"4..\"}[5m]))",
+          "legendFormat": "4xx errors/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["brain-tumor", "api"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Brain Tumor AI Platform",
+  "uid": "brain-tumor-overview"
+}
